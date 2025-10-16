@@ -5,619 +5,1889 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Oral Admin Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f8fafc; /* A slightly off-white background */
-        }
-        /* Custom scrollbar for a cleaner look */
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #d1d5db;
-            border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: #a3aab9;
-        }
-        /* Sidebar transition */
-        .sidebar {
+        /* Custom CSS for mobile responsiveness and animations */
+        .sidebar-transition {
             transition: transform 0.3s ease-in-out;
         }
-        @media (max-width: 1024px) {
-            .sidebar {
-                transform: translateX(-100%);
+        
+        .mobile-sidebar {
+            transform: translateX(-100%);
+        }
+        
+        .mobile-sidebar.open {
+            transform: translateX(0);
+        }
+        
+        .toast {
+            transition: all 0.3s ease-in-out;
+            transform: translateY(-100%);
+            opacity: 0;
+        }
+        
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        
+        .modal {
+            transition: all 0.3s ease-in-out;
+        }
+        
+        .modal-backdrop {
+            backdrop-filter: blur(4px);
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+        
+        .fc-event {
+            cursor: pointer;
+        }
+        
+        .dark {
+            background-color: #1a202c;
+            color: #ffffff;
+        }
+        
+        .dark .bg-white {
+            background-color: #2d3748 !important;
+        }
+        
+        .dark .text-gray-900 {
+            color: #ffffff !important;
+        }
+        
+        .dark .text-gray-600 {
+            color: #a0aec0 !important;
+        }
+        
+        .dark .bg-gray-50 {
+            background-color: #2d3748 !important;
+        }
+        
+        .dark .border-gray-200 {
+            border-color: #4a5568 !important;
+        }
+        
+        /* Mobile-specific styles */
+        @media (max-width: 640px) {
+            .mobile-hidden {
+                display: none;
             }
-            .sidebar.open {
-                transform: translateX(0);
+            
+            .mobile-full {
+                width: 100% !important;
+            }
+            
+            .mobile-p-4 {
+                padding: 1rem !important;
+            }
+            
+            .mobile-text-sm {
+                font-size: 0.875rem !important;
             }
         }
-        .sidebar .nav-link.active {
-            background-color: #3b82f6;
-            color: white;
-            font-weight: 600;
+        
+        /* Touch-friendly buttons */
+        .touch-target {
+            min-height: 44px;
+            min-width: 44px;
         }
-        .sidebar .nav-link:not(.active) {
-            color: #4b5563;
+        
+        /* Pull to refresh animation */
+        .pull-to-refresh {
+            transform: translateY(0);
+            transition: transform 0.3s ease;
         }
-        .sidebar .nav-link:not(.active):hover {
-            background-color: #f3f4f6;
-        }
-        .calendar-day:hover {
-            background-color: #f9fafb;
+        
+        .pull-to-refresh.pulling {
+            transform: translateY(50px);
         }
     </style>
 </head>
-<body class="flex h-screen overflow-hidden">
+<body class="bg-gray-50 transition-colors duration-200" id="body">
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2">
+        <!-- Toast messages will be inserted here -->
+    </div>
+    
+    <!-- Mobile Overlay -->
+    <div id="mobile-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden lg:hidden" onclick="toggleSidebar()"></div>
+    
     <!-- Sidebar -->
-    <aside class="sidebar fixed inset-y-0 left-0 z-30 w-64 bg-white shadow-lg lg:static lg:inset-auto lg:translate-x-0 custom-scrollbar overflow-y-auto">
-        <div class="flex items-center justify-between p-4 border-b">
-            <h1 class="text-2xl font-bold text-blue-600">Oral Admin</h1>
-            <button id="close-sidebar" class="lg:hidden">
-                <i class="fas fa-times text-xl"></i>
-            </button>
-        </div>
-        <nav class="mt-4 px-2">
-            <ul>
-                <li class="mb-1">
-                    <a href="#" class="nav-link flex items-center p-3 rounded-lg active" data-target="dashboard">
-                        <i class="fas fa-tachometer-alt w-6 text-center"></i><span class="ml-3">Dashboard</span>
-                    </a>
-                </li>
-                <li class="mb-1">
-                    <a href="#" class="nav-link flex items-center p-3 rounded-lg" data-target="schedule">
-                        <i class="fas fa-calendar-alt w-6 text-center"></i><span class="ml-3">Schedule</span>
-                    </a>
-                </li>
-                <li class="mb-1">
-                    <a href="#" class="nav-link flex items-center p-3 rounded-lg" data-target="doctors">
-                        <i class="fas fa-user-md w-6 text-center"></i><span class="ml-3">Doctors</span>
-                    </a>
-                </li>
-                 <li class="mt-4 mb-2 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Apps & Pages</li>
-                 <!-- Collapsible Menu Example -->
-                <li>
-                    <button type="button" class="flex items-center w-full p-3 text-base text-gray-600 transition duration-75 rounded-lg group hover:bg-gray-100" aria-controls="dropdown-support" data-collapse-toggle="dropdown-support">
-                          <i class="fa-solid fa-life-ring w-6 text-center"></i>
-                          <span class="flex-1 ms-3 text-left rtl:text-right whitespace-nowrap">Support</span>
-                          <i class="fa-solid fa-chevron-down"></i>
-                    </button>
-                    <!-- <ul id="dropdown-support" class="hidden py-2 space-y-2">...</ul> -->
-                 </li>
-                 <li>
-                    <a href="#" class="flex items-center p-3 text-gray-600 hover:bg-gray-100 rounded-lg">
-                        <i class="fas fa-th-large w-6 text-center"></i><span class="ml-3">Apps</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="#" class="flex items-center p-3 text-gray-600 hover:bg-gray-100 rounded-lg">
-                        <i class="fas fa-box w-6 text-center"></i><span class="ml-3">Widgets</span>
-                    </a>
-                </li>
-                <li class="mt-4 mb-2 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">User Interface</li>
-                <li>
-                    <a href="#" class="flex items-center p-3 text-gray-600 hover:bg-gray-100 rounded-lg">
-                        <i class="fas fa-star w-6 text-center"></i><span class="ml-3">Features</span>
-                    </a>
-                </li>
-                 <li>
-                    <a href="#" class="flex items-center p-3 text-gray-600 hover:bg-gray-100 rounded-lg">
-                        <i class="fas fa-icons w-6 text-center"></i><span class="ml-3">Icons</span>
-                    </a>
-                </li>
-            </ul>
-        </nav>
-        <div class="sticky bottom-0 bg-white w-full p-4 border-t">
-            <p class="text-xs text-gray-500">Oral Admin Dashboard</p>
-            <p class="text-xs text-gray-500">&copy; 2024 All Rights Reserved</p>
-        </div>
-    </aside>
-
-    <!-- Main Content -->
-    <div class="flex-1 flex flex-col overflow-hidden">
-        <!-- Header -->
-        <header class="flex items-center justify-between p-4 bg-white border-b">
-            <div class="flex items-center">
-                <button id="open-sidebar" class="text-gray-600 focus:outline-none lg:hidden">
-                    <i class="fas fa-bars text-xl"></i>
-                </button>
-                <div class="relative ml-4">
-                    <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                    <input type="text" placeholder="Search" class="pl-10 pr-4 py-2 w-40 sm:w-full border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+    <div id="sidebar" class="fixed left-0 top-0 h-full w-64 bg-blue-600 text-white z-40 sidebar-transition mobile-sidebar lg:translate-x-0">
+        <div class="p-6">
+            <div class="flex items-center space-x-3 mb-8">
+                <div class="bg-white rounded-lg p-2">
+                    <i class="fas fa-tooth text-blue-600 text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold">Oral Admin</h1>
+                    <p class="text-blue-200 text-sm">Dashboard</p>
                 </div>
             </div>
-            <div class="flex items-center space-x-2 sm:space-x-4">
-                 <button class="text-gray-600 hover:text-blue-500"><i class="fas fa-moon text-xl"></i></button>
-                 <button class="text-gray-600 hover:text-blue-500"><i class="fas fa-bell text-xl"></i></button>
-                 <button class="text-gray-600 hover:text-blue-500"><i class="fas fa-comment-dots text-xl"></i></button>
-                 <button class="text-gray-600 hover:text-blue-500"><i class="fas fa-user-friends text-xl"></i></button>
-                 <img src="https://placehold.co/40x40/E2E8F0/4A5568?text=U" alt="User" class="w-10 h-10 rounded-full">
+            
+            <nav class="space-y-2">
+                <a href="#" onclick="showPage('dashboard')" class="nav-item flex items-center space-x-3 p-3 rounded-lg hover:bg-blue-700 transition-colors active">
+                    <i class="fas fa-home w-5"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" onclick="showPage('schedule')" class="nav-item flex items-center space-x-3 p-3 rounded-lg hover:bg-blue-700 transition-colors">
+                    <i class="fas fa-calendar w-5"></i>
+                    <span>Schedule</span>
+                </a>
+                <a href="#" onclick="showPage('doctors')" class="nav-item flex items-center space-x-3 p-3 rounded-lg hover:bg-blue-700 transition-colors">
+                    <i class="fas fa-user-md w-5"></i>
+                    <span>Doctors</span>
+                </a>
+                <a href="#" onclick="showPage('patients')" class="nav-item flex items-center space-x-3 p-3 rounded-lg hover:bg-blue-700 transition-colors">
+                    <i class="fas fa-users w-5"></i>
+                    <span>Patients</span>
+                </a>
+                <a href="#" onclick="showPage('settings')" class="nav-item flex items-center space-x-3 p-3 rounded-lg hover:bg-blue-700 transition-colors">
+                    <i class="fas fa-cog w-5"></i>
+                    <span>Settings</span>
+                </a>
+                <a href="#" onclick="showPage('profile')" class="nav-item flex items-center space-x-3 p-3 rounded-lg hover:bg-blue-700 transition-colors">
+                    <i class="fas fa-user w-5"></i>
+                    <span>Profile</span>
+                </a>
+            </nav>
+        </div>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="lg:ml-64">
+        <!-- Header -->
+        <header class="bg-white shadow-sm border-b border-gray-200 p-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <button onclick="toggleSidebar()" class="lg:hidden text-gray-600 hover:text-gray-900 touch-target">
+                        <i class="fas fa-bars text-xl"></i>
+                    </button>
+                    <h2 id="page-title" class="text-xl font-semibold text-gray-900">Dashboard</h2>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <!-- Search -->
+                    <div class="relative hidden md:block">
+                        <input type="text" id="global-search" placeholder="Search..." class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64">
+                        <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    </div>
+                    
+                    <!-- Mobile Search Button -->
+                    <button onclick="toggleMobileSearch()" class="md:hidden text-gray-600 hover:text-gray-900 touch-target">
+                        <i class="fas fa-search"></i>
+                    </button>
+                    
+                    <!-- Dark Mode Toggle -->
+                    <button onclick="toggleDarkMode()" class="text-gray-600 hover:text-gray-900 touch-target">
+                        <i id="dark-mode-icon" class="fas fa-moon"></i>
+                    </button>
+                    
+                    <!-- Notifications -->
+                    <button onclick="showNotifications()" class="relative text-gray-600 hover:text-gray-900 touch-target">
+                        <i class="fas fa-bell"></i>
+                        <span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">3</span>
+                    </button>
+                    
+                    <!-- Profile -->
+                    <div class="relative">
+                        <button onclick="toggleProfileMenu()" class="flex items-center space-x-2 text-gray-700 hover:text-gray-900">
+                            <img src="https://placehold.co/32x32/3B82F6/FFFFFF?text=AD" alt="Admin" class="w-8 h-8 rounded-full">
+                            <span class="hidden md:inline">Admin</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Mobile Search Bar -->
+            <div id="mobile-search" class="hidden mt-4 md:hidden">
+                <input type="text" id="mobile-search-input" placeholder="Search..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
             </div>
         </header>
-
-        <!-- ========= CONTENT AREA WRAPPER ========= -->
-        <div class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-4 sm:p-6 custom-scrollbar">
-            
-            <!-- Dashboard Content -->
-            <main id="dashboard" class="page-content">
-                <h2 class="text-xl sm:text-2xl font-semibold text-gray-800">Welcome Back, Dr. Ananya!</h2>
-            
-                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mt-6">
-                    <!-- Stat Cards -->
-                    <div class="bg-white p-6 rounded-xl shadow-sm flex items-center justify-between">
-                        <div>
-                            <p class="text-sm font-medium text-gray-500">Total Patients</p>
-                            <p class="text-3xl font-bold text-gray-800">180</p>
-                            <p class="text-sm text-green-500 flex items-center mt-1"><i class="fas fa-arrow-up mr-1"></i> 10%</p>
-                        </div>
-                        <button class="text-blue-500 hover:text-blue-700 text-sm font-semibold">View report</button>
-                    </div>
-                    <div class="bg-white p-6 rounded-xl shadow-sm flex items-center justify-between">
-                        <div>
-                            <p class="text-sm font-medium text-gray-500">Consultation</p>
-                            <p class="text-3xl font-bold text-gray-800">80</p>
-                            <p class="text-sm text-green-500 flex items-center mt-1"><i class="fas fa-arrow-up mr-1"></i> 15%</p>
-                        </div>
-                        <button class="text-blue-500 hover:text-blue-700 text-sm font-semibold">View report</button>
-                    </div>
-                    <div class="bg-white p-6 rounded-xl shadow-sm flex items-center justify-between">
-                        <div>
-                            <p class="text-sm font-medium text-gray-500">Procedure</p>
-                            <p class="text-3xl font-bold text-gray-800">50</p>
-                            <p class="text-sm text-red-500 flex items-center mt-1"><i class="fas fa-arrow-down mr-1"></i> 8%</p>
-                        </div>
-                        <button class="text-blue-500 hover:text-blue-700 text-sm font-semibold">View report</button>
-                    </div>
-                    <div class="bg-white p-6 rounded-xl shadow-sm flex items-center justify-between">
-                        <div>
-                            <p class="text-sm font-medium text-gray-500">Payment</p>
-                            <p class="text-3xl font-bold text-gray-800">₹1,25,000</p>
-                            <p class="text-sm text-green-500 flex items-center mt-1"><i class="fas fa-arrow-up mr-1"></i> 10%</p>
-                        </div>
-                        <button class="text-blue-500 hover:text-blue-700 text-sm font-semibold">View report</button>
-                    </div>
-                </div>
-
-                <!-- Main Chart & Patient Details -->
-                <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mt-6">
-                    <!-- Appointment Chart -->
-                    <div class="xl:col-span-2 bg-white p-6 rounded-xl shadow-sm">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-lg font-semibold text-gray-800">Appointment</h3>
-                            <div class="flex space-x-1 bg-gray-100 p-1 rounded-lg">
-                                <button class="px-3 py-1 text-sm rounded-md hover:bg-gray-200">Weekly</button>
-                                <button class="px-3 py-1 text-sm rounded-md bg-white shadow font-semibold text-blue-600">Monthly</button>
-                                <button class="px-3 py-1 text-sm rounded-md hover:bg-gray-200">Yearly</button>
+        
+        <!-- Page Content -->
+        <main class="p-4 lg:p-6">
+            <!-- Dashboard Page -->
+            <div id="dashboard-page" class="page-content">
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-6">
+                    <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-600 text-sm font-medium">Total Patients</p>
+                                <p class="text-2xl font-bold text-gray-900">180</p>
+                                <p class="text-green-600 text-sm mt-1">
+                                    <i class="fas fa-arrow-up"></i> +10% from last month
+                                </p>
+                            </div>
+                            <div class="bg-blue-100 p-3 rounded-full">
+                                <i class="fas fa-users text-blue-600"></i>
                             </div>
                         </div>
-                        <div class="h-80 relative">
+                    </div>
+                    
+                    <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-600 text-sm font-medium">Consultations</p>
+                                <p class="text-2xl font-bold text-gray-900">80</p>
+                                <p class="text-green-600 text-sm mt-1">
+                                    <i class="fas fa-arrow-up"></i> +5% this week
+                                </p>
+                            </div>
+                            <div class="bg-green-100 p-3 rounded-full">
+                                <i class="fas fa-stethoscope text-green-600"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-600 text-sm font-medium">Revenue</p>
+                                <p class="text-2xl font-bold text-gray-900">₹1,25,000</p>
+                                <p class="text-yellow-600 text-sm mt-1">
+                                    <i class="fas fa-minus"></i> -2% from last month
+                                </p>
+                            </div>
+                            <div class="bg-yellow-100 p-3 rounded-full">
+                                <i class="fas fa-rupee-sign text-yellow-600"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-600 text-sm font-medium">Success Rate</p>
+                                <p class="text-2xl font-bold text-gray-900">95%</p>
+                                <p class="text-green-600 text-sm mt-1">
+                                    <i class="fas fa-arrow-up"></i> +3% improvement
+                                </p>
+                            </div>
+                            <div class="bg-purple-100 p-3 rounded-full">
+                                <i class="fas fa-chart-line text-purple-600"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Charts Row -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <!-- Appointments Chart -->
+                    <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-900">Appointments &amp; Revenue</h3>
+                            <button onclick="exportChart('appointmentChart')" class="text-blue-600 hover:text-blue-800">
+                                <i class="fas fa-download"></i>
+                            </button>
+                        </div>
+                        <div class="chart-container">
                             <canvas id="appointmentChart"></canvas>
                         </div>
                     </div>
-
-                    <div class="space-y-6">
-                        <!-- Top Treatments -->
-                        <div class="bg-white p-6 rounded-xl shadow-sm">
-                            <h3 class="text-lg font-semibold text-gray-800 mb-4">Top Treatments</h3>
-                            <div class="flex items-center justify-around">
-                                <div class="w-32 h-32">
-                                    <canvas id="treatmentsChart"></canvas>
+                    
+                    <!-- Treatments Chart -->
+                    <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-900">Treatment Distribution</h3>
+                            <button onclick="exportChart('treatmentChart')" class="text-blue-600 hover:text-blue-800">
+                                <i class="fas fa-download"></i>
+                            </button>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="treatmentChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Quick Actions & Recent Activity -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Quick Actions -->
+                    <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <button onclick="openModal('appointmentModal')" class="flex flex-col items-center p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors touch-target">
+                                <i class="fas fa-calendar-plus text-blue-600 text-xl mb-2"></i>
+                                <span class="text-sm font-medium text-blue-600">New Appointment</span>
+                            </button>
+                            <button onclick="openModal('patientModal')" class="flex flex-col items-center p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors touch-target">
+                                <i class="fas fa-user-plus text-green-600 text-xl mb-2"></i>
+                                <span class="text-sm font-medium text-green-600">Add Patient</span>
+                            </button>
+                            <button onclick="openModal('doctorModal')" class="flex flex-col items-center p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors touch-target">
+                                <i class="fas fa-user-md text-purple-600 text-xl mb-2"></i>
+                                <span class="text-sm font-medium text-purple-600">Add Doctor</span>
+                            </button>
+                            <button onclick="generateReport()" class="flex flex-col items-center p-4 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition-colors touch-target">
+                                <i class="fas fa-file-alt text-yellow-600 text-xl mb-2"></i>
+                                <span class="text-sm font-medium text-yellow-600">Generate Report</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Recent Activity -->
+                    <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
+                        <div class="space-y-4">
+                            <div class="flex items-center space-x-3">
+                                <div class="bg-green-100 p-2 rounded-full">
+                                    <i class="fas fa-check text-green-600 text-sm"></i>
                                 </div>
-                                <div class="text-sm space-y-2">
-                                    <p class="flex items-center"><span class="w-3 h-3 rounded-full bg-blue-500 mr-2"></span> Root Canal</p>
-                                    <p class="flex items-center"><span class="w-3 h-3 rounded-full bg-green-500 mr-2"></span> Wisdom Tooth</p>
-                                    <p class="flex items-center"><span class="w-3 h-3 rounded-full bg-yellow-500 mr-2"></span> Bleaching</p>
-                                    <p class="flex items-center"><span class="w-3 h-3 rounded-full bg-red-500 mr-2"></span> Others</p>
+                                <div class="flex-1">
+                                    <p class="text-sm font-medium text-gray-900">Appointment completed</p>
+                                    <p class="text-xs text-gray-600">Saanvi Sharma - Root Canal Treatment</p>
                                 </div>
+                                <span class="text-xs text-gray-500">2 min ago</span>
                             </div>
-                        </div>
-
-                        <!-- Next Patient Details -->
-                        <div class="bg-white p-6 rounded-xl shadow-sm">
-                            <h3 class="text-lg font-semibold text-gray-800 mb-4">Next Patient Details</h3>
-                            <div class="flex items-center space-x-4 mb-4">
-                                <img src="https://placehold.co/48x48/E2E8F0/4A5568?text=S" alt="Sophia" class="w-12 h-12 rounded-full">
-                                <div>
-                                    <p class="font-semibold text-gray-800">Saanvi Sharma</p>
-                                    <p class="text-sm text-gray-500">Root Canal Treatment</p>
+                            
+                            <div class="flex items-center space-x-3">
+                                <div class="bg-blue-100 p-2 rounded-full">
+                                    <i class="fas fa-calendar text-blue-600 text-sm"></i>
                                 </div>
+                                <div class="flex-1">
+                                    <p class="text-sm font-medium text-gray-900">New appointment scheduled</p>
+                                    <p class="text-xs text-gray-600">Arjun Patel - Teeth Cleaning</p>
+                                </div>
+                                <span class="text-xs text-gray-500">15 min ago</span>
                             </div>
-                            <div class="grid grid-cols-2 gap-4 text-sm">
-                                <div><p class="text-gray-500">Patient Id</p><p class="font-medium text-gray-800">124569</p></div>
-                                <div><p class="text-gray-500">Last Visit</p><p class="font-medium text-gray-800">05.12.2024</p></div>
-                                <div><p class="text-gray-500">Gender</p><p class="font-medium text-gray-800">Female</p></div>
-                                <div><p class="text-gray-500">Age</p><p class="font-medium text-gray-800">24</p></div>
-                                <div><p class="text-gray-500">Height</p><p class="font-medium text-gray-800">155cm</p></div>
-                                <div><p class="text-gray-500">Weight</p><p class="font-medium text-gray-800">60</p></div>
+                            
+                            <div class="flex items-center space-x-3">
+                                <div class="bg-purple-100 p-2 rounded-full">
+                                    <i class="fas fa-user-plus text-purple-600 text-sm"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="text-sm font-medium text-gray-900">New patient registered</p>
+                                    <p class="text-xs text-gray-600">Meera Singh - ID: 124571</p>
+                                </div>
+                                <span class="text-xs text-gray-500">1 hour ago</span>
                             </div>
                         </div>
                     </div>
                 </div>
-            </main>
-
-            <!-- Schedule Content -->
-            <main id="schedule" class="page-content hidden">
-                <h2 class="text-xl sm:text-2xl font-semibold text-gray-800 mb-6">Schedule</h2>
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm">
-                        <div class="flex flex-col sm:flex-row justify-between items-center mb-4">
-                            <div class="flex items-center space-x-2 mb-4 sm:mb-0">
-                                <button id="prevMonthBtn" class="px-3 py-1.5 border rounded-lg hover:bg-gray-100">Prev</button>
-                                <button id="nextMonthBtn" class="px-3 py-1.5 border rounded-lg hover:bg-gray-100">Next</button>
-                                <button id="todayBtn" class="px-3 py-1.5 border rounded-lg hover:bg-gray-100 font-semibold">Today</button>
-                            </div>
-                            <h3 id="calendarHeader" class="text-lg font-semibold text-gray-800"></h3>
-                            <div class="flex space-x-1 bg-gray-100 p-1 rounded-lg mt-4 sm:mt-0">
-                                <button class="px-3 py-1 text-sm rounded-md hover:bg-gray-200">Month</button>
-                                <button class="px-3 py-1 text-sm rounded-md hover:bg-gray-200">Week</button>
-                                <button class="px-3 py-1 text-sm rounded-md bg-white shadow font-semibold text-blue-600">Day</button>
-                            </div>
-                        </div>
-                        <div id="calendarGrid" class="grid grid-cols-7 gap-px border-l border-t border-gray-200 bg-gray-200">
-                            <!-- Day Headers -->
-                            <div class="text-center py-2 bg-white text-xs font-semibold text-gray-500">Sun</div>
-                            <div class="text-center py-2 bg-white text-xs font-semibold text-gray-500">Mon</div>
-                            <div class="text-center py-2 bg-white text-xs font-semibold text-gray-500">Tue</div>
-                            <div class="text-center py-2 bg-white text-xs font-semibold text-gray-500">Wed</div>
-                            <div class="text-center py-2 bg-white text-xs font-semibold text-gray-500">Thu</div>
-                            <div class="text-center py-2 bg-white text-xs font-semibold text-gray-500">Fri</div>
-                            <div class="text-center py-2 bg-white text-xs font-semibold text-gray-500">Sat</div>
-                            <!-- Calendar dates will be generated by JS -->
-                        </div>
-                    </div>
-                    <div class="bg-white p-6 rounded-xl shadow-sm self-start">
-                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Draggable Events</h3>
-                        <div class="space-y-3">
-                            <div class="p-3 bg-blue-500 text-white rounded-lg cursor-move">LUNCH</div>
-                            <div class="p-3 bg-yellow-500 text-white rounded-lg cursor-move">GO HOME</div>
-                            <div class="p-3 bg-purple-600 text-white rounded-lg cursor-move">DO HOMEWORK</div>
-                            <div class="p-3 bg-green-500 text-white rounded-lg cursor-move">WORK ON UI DESIGN</div>
-                            <div class="p-3 bg-pink-500 text-white rounded-lg cursor-move">SLEEP TIGHT</div>
-                        </div>
-                        <div class="mt-6">
-                            <label class="flex items-center">
-                                <input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                                <span class="ml-2 text-sm text-gray-600">Remove after drop</span>
-                            </label>
-                        </div>
-                        <div class="mt-4 flex flex-col space-y-2">
-                             <button id="addNewEventBtn" class="w-full py-2 bg-green-100 text-green-600 font-semibold rounded-lg hover:bg-green-200">Add New Event</button>
-                             <button id="createNewEventBtn" class="w-full py-2 bg-red-100 text-red-600 font-semibold rounded-lg hover:bg-red-200">Create New Event</button>
-                        </div>
-                    </div>
-                </div>
-            </main>
-
-            <!-- Doctors Content -->
-            <main id="doctors" class="page-content hidden">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-xl sm:text-2xl font-semibold text-gray-800">Our Doctors</h2>
-                    <button class="px-4 py-2 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600 flex items-center">
-                        <i class="fas fa-plus mr-2"></i> Add Doctor
-                    </button>
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    <!-- Doctor Card Example -->
-                    <div class="bg-white rounded-xl shadow-sm text-center p-6">
-                        <img src="https://placehold.co/100x100/E2E8F0/4A5568?text=Dr" alt="Doctor" class="w-24 h-24 rounded-full mx-auto mb-4">
-                        <h4 class="text-lg font-semibold text-gray-800">Dr. Rahul Gupta</h4>
-                        <p class="text-gray-500 text-sm">Orthodontist</p>
-                        <div class="mt-4 flex justify-center space-x-3">
-                            <a href="#" class="text-gray-400 hover:text-blue-500"><i class="fab fa-facebook-f"></i></a>
-                            <a href="#" class="text-gray-400 hover:text-blue-500"><i class="fab fa-twitter"></i></a>
-                            <a href="#" class="text-gray-400 hover:text-blue-500"><i class="fab fa-linkedin-in"></i></a>
-                        </div>
-                        <button class="w-full mt-6 py-2 bg-blue-50 text-blue-600 font-semibold rounded-lg hover:bg-blue-100">View Profile</button>
-                    </div>
-                     <div class="bg-white rounded-xl shadow-sm text-center p-6">
-                        <img src="https://placehold.co/100x100/E2E8F0/4A5568?text=Dr" alt="Doctor" class="w-24 h-24 rounded-full mx-auto mb-4">
-                        <h4 class="text-lg font-semibold text-gray-800">Dr. Priya Sharma</h4>
-                        <p class="text-gray-500 text-sm">Dentist</p>
-                        <div class="mt-4 flex justify-center space-x-3">
-                            <a href="#" class="text-gray-400 hover:text-blue-500"><i class="fab fa-facebook-f"></i></a>
-                            <a href="#" class="text-gray-400 hover:text-blue-500"><i class="fab fa-twitter"></i></a>
-                            <a href="#" class="text-gray-400 hover:text-blue-500"><i class="fab fa-linkedin-in"></i></a>
-                        </div>
-                        <button class="w-full mt-6 py-2 bg-blue-50 text-blue-600 font-semibold rounded-lg hover:bg-blue-100">View Profile</button>
-                    </div>
-                     <div class="bg-white rounded-xl shadow-sm text-center p-6">
-                        <img src="https://placehold.co/100x100/E2E8F0/4A5568?text=Dr" alt="Doctor" class="w-24 h-24 rounded-full mx-auto mb-4">
-                        <h4 class="text-lg font-semibold text-gray-800">Dr. Vikram Singh</h4>
-                        <p class="text-gray-500 text-sm">Prosthodontist</p>
-                        <div class="mt-4 flex justify-center space-x-3">
-                            <a href="#" class="text-gray-400 hover:text-blue-500"><i class="fab fa-facebook-f"></i></a>
-                            <a href="#" class="text-gray-400 hover:text-blue-500"><i class="fab fa-twitter"></i></a>
-                            <a href="#" class="text-gray-400 hover:text-blue-500"><i class="fab fa-linkedin-in"></i></a>
-                        </div>
-                        <button class="w-full mt-6 py-2 bg-blue-50 text-blue-600 font-semibold rounded-lg hover:bg-blue-100">View Profile</button>
-                    </div>
-                     <div class="bg-white rounded-xl shadow-sm text-center p-6">
-                        <img src="https://placehold.co/100x100/E2E8F0/4A5568?text=Dr" alt="Doctor" class="w-24 h-24 rounded-full mx-auto mb-4">
-                        <h4 class="text-lg font-semibold text-gray-800">Dr. Sneha Reddy</h4>
-                        <p class="text-gray-500 text-sm">Pediatric Dentist</p>
-                        <div class="mt-4 flex justify-center space-x-3">
-                            <a href="#" class="text-gray-400 hover:text-blue-500"><i class="fab fa-facebook-f"></i></a>
-                            <a href="#" class="text-gray-400 hover:text-blue-500"><i class="fab fa-twitter"></i></a>
-                            <a href="#" class="text-gray-400 hover:text-blue-500"><i class="fab fa-linkedin-in"></i></a>
-                        </div>
-                        <button class="w-full mt-6 py-2 bg-blue-50 text-blue-600 font-semibold rounded-lg hover:bg-blue-100">View Profile</button>
-                    </div>
-                </div>
-            </main>
-        </div>
-    </div>
-
-    <!-- Edit Event Modal -->
-    <div id="editEventModal" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden flex items-center justify-center">
-        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-            <h3 class="text-lg font-semibold text-gray-800 mb-4">Edit Event</h3>
-            <div>
-                <label for="editEventTitleInput" class="block text-sm font-medium text-gray-700">Event Title</label>
-                <input type="text" id="editEventTitleInput" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                <input type="hidden" id="editEventId">
             </div>
-            <div class="mt-6 flex justify-end space-x-3">
-                <button class="modal-close-btn px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
-                <button id="deleteEventBtn" type="button" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600">Delete Event</button>
-                <button id="saveEventBtn" type="button" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">Save Changes</button>
+            
+            <!-- Schedule Page -->
+            <div id="schedule-page" class="page-content hidden">
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+                    <div class="p-4 lg:p-6 border-b border-gray-200">
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+                            <h3 class="text-lg font-semibold text-gray-900">Schedule Management</h3>
+                            <div class="flex items-center space-x-2">
+                                <button onclick="openModal('eventModal')" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors touch-target">
+                                    <i class="fas fa-plus mr-2"></i>Add Event
+                                </button>
+                                <button onclick="refreshCalendar()" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors touch-target">
+                                    <i class="fas fa-refresh"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-4 lg:p-6">
+                        <div id="calendar"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Doctors Page -->
+            <div id="doctors-page" class="page-content hidden">
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+                    <div class="p-4 lg:p-6 border-b border-gray-200">
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+                            <h3 class="text-lg font-semibold text-gray-900">Doctor Management</h3>
+                            <button onclick="openModal('doctorModal')" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors touch-target">
+                                <i class="fas fa-plus mr-2"></i>Add Doctor
+                            </button>
+                        </div>
+                    </div>
+                    <div class="p-4 lg:p-6">
+                        <div id="doctors-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <!-- Doctor cards will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Patients Page -->
+            <div id="patients-page" class="page-content hidden">
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+                    <div class="p-4 lg:p-6 border-b border-gray-200">
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+                            <h3 class="text-lg font-semibold text-gray-900">Patient Management</h3>
+                            <button onclick="openModal('patientModal')" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors touch-target">
+                                <i class="fas fa-plus mr-2"></i>Add Patient
+                            </button>
+                        </div>
+                    </div>
+                    <div class="p-4 lg:p-6">
+                        <!-- Mobile-friendly table -->
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left" id="patients-table">
+                                <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3">Patient</th>
+                                        <th class="px-6 py-3 hidden sm:table-cell">Contact</th>
+                                        <th class="px-6 py-3 hidden md:table-cell">Last Visit</th>
+                                        <th class="px-6 py-3">Status</th>
+                                        <th class="px-6 py-3">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="patients-tbody">
+                                    <!-- Patient rows will be populated here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Settings Page -->
+            <div id="settings-page" class="page-content hidden">
+                <div class="max-w-4xl mx-auto space-y-6">
+                    <!-- General Settings -->
+                    <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">General Settings</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Clinic Name</label>
+                                <input type="text" value="Oral Care Clinic" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                                <input type="tel" value="+91 98765 43210" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Address</label>
+                                <textarea rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">123 Medical Street, Mumbai, MH 400001</textarea>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Appointment Settings -->
+                    <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Appointment Settings</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Default Duration (minutes)</label>
+                                <select class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                    <option value="30">30 minutes</option>
+                                    <option value="45" selected>45 minutes</option>
+                                    <option value="60">60 minutes</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Buffer Time (minutes)</label>
+                                <select class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                    <option value="5">5 minutes</option>
+                                    <option value="10" selected>10 minutes</option>
+                                    <option value="15">15 minutes</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Notification Settings -->
+                    <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Notifications</h3>
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <label class="text-sm font-medium text-gray-700">Email Notifications</label>
+                                    <p class="text-xs text-gray-500">Receive email alerts for appointments</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" class="sr-only peer" checked>
+                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
+                            
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <label class="text-sm font-medium text-gray-700">SMS Notifications</label>
+                                    <p class="text-xs text-gray-500">Send SMS reminders to patients</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" class="sr-only peer" checked>
+                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Save Settings -->
+                    <div class="flex justify-end">
+                        <button onclick="saveSettings()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors touch-target">
+                            <i class="fas fa-save mr-2"></i>Save Settings
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Profile Page -->
+            <div id="profile-page" class="page-content hidden">
+                <div class="max-w-4xl mx-auto">
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+                        <div class="p-6 border-b border-gray-200">
+                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+                                <div class="flex items-center space-x-4">
+                                    <img src="https://placehold.co/80x80/3B82F6/FFFFFF?text=AD" alt="Admin" class="w-20 h-20 rounded-full">
+                                    <div>
+                                        <h2 class="text-2xl font-bold text-gray-900">Admin User</h2>
+                                        <p class="text-gray-600">System Administrator</p>
+                                    </div>
+                                </div>
+                                <button onclick="editProfile()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors touch-target">
+                                    <i class="fas fa-edit mr-2"></i>Edit Profile
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="p-6">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <!-- Personal Information -->
+                                <div>
+                                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Personal Information</h3>
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                                            <input type="text" value="Admin User" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" readonly>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                                            <input type="email" value="admin@oral.com" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" readonly>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+                                            <input type="tel" value="+91 98765 43210" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" readonly>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Security Settings -->
+                                <div>
+                                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Security</h3>
+                                    <div class="space-y-4">
+                                        <button onclick="changePassword()" class="w-full bg-gray-100 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-200 transition-colors text-left touch-target">
+                                            <div class="flex items-center justify-between">
+                                                <div>
+                                                    <p class="font-medium">Change Password</p>
+                                                    <p class="text-sm text-gray-500">Update your login password</p>
+                                                </div>
+                                                <i class="fas fa-chevron-right text-gray-400"></i>
+                                            </div>
+                                        </button>
+                                        
+                                        <button onclick="enableTwoFactor()" class="w-full bg-gray-100 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-200 transition-colors text-left touch-target">
+                                            <div class="flex items-center justify-between">
+                                                <div>
+                                                    <p class="font-medium">Two-Factor Authentication</p>
+                                                    <p class="text-sm text-gray-500">Add extra security to your account</p>
+                                                </div>
+                                                <i class="fas fa-chevron-right text-gray-400"></i>
+                                            </div>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Modals -->
+    
+    <!-- Doctor Modal -->
+    <div id="doctorModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden modal-backdrop">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+                <div class="p-6 border-b border-gray-200">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-semibold text-gray-900" id="doctor-modal-title">Add Doctor</h3>
+                        <button onclick="closeModal('doctorModal')" class="text-gray-400 hover:text-gray-600 touch-target">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <form id="doctor-form" class="p-6 space-y-4">
+                    <input type="hidden" id="doctor-id">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                        <input type="text" id="doctor-name" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Specialty</label>
+                        <select id="doctor-specialty" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <option value="">Select Specialty</option>
+                            <option value="Orthodontist">Orthodontist</option>
+                            <option value="Dentist">Dentist</option>
+                            <option value="Prosthodontist">Prosthodontist</option>
+                            <option value="Pediatric Dentist">Pediatric Dentist</option>
+                            <option value="Oral Surgeon">Oral Surgeon</option>
+                            <option value="Endodontist">Endodontist</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+                        <input type="tel" id="doctor-phone" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                        <input type="email" id="doctor-email" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Experience (years)</label>
+                        <input type="number" id="doctor-experience" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    
+                    <div class="flex space-x-3 pt-4">
+                        <button type="submit" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors touch-target">
+                            <i class="fas fa-save mr-2"></i>Save
+                        </button>
+                        <button type="button" onclick="closeModal('doctorModal')" class="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition-colors touch-target">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
     
-    <!-- Add Event Modal -->
-    <div id="addEventModal" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden flex items-center justify-center">
-        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-            <h3 class="text-lg font-semibold text-gray-800 mb-4">Add Event</h3>
-            <div>
-                <label for="addEventTitleInput" class="block text-sm font-medium text-gray-700">Event Title</label>
-                <input type="text" id="addEventTitleInput" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+    <!-- Patient Modal -->
+    <div id="patientModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden modal-backdrop">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+                <div class="p-6 border-b border-gray-200">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-semibold text-gray-900" id="patient-modal-title">Add Patient</h3>
+                        <button onclick="closeModal('patientModal')" class="text-gray-400 hover:text-gray-600 touch-target">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <form id="patient-form" class="p-6 space-y-4">
+                    <input type="hidden" id="patient-id">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                        <input type="text" id="patient-name" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Age</label>
+                            <input type="number" id="patient-age" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Gender</label>
+                            <select id="patient-gender" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                <option value="">Select</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+                        <input type="tel" id="patient-phone" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                        <input type="email" id="patient-email" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Address</label>
+                        <textarea id="patient-address" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+                    </div>
+                    
+                    <div class="flex space-x-3 pt-4">
+                        <button type="submit" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors touch-target">
+                            <i class="fas fa-save mr-2"></i>Save
+                        </button>
+                        <button type="button" onclick="closeModal('patientModal')" class="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition-colors touch-target">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
             </div>
-             <div class="mt-4">
-                <label for="addEventDateInput" class="block text-sm font-medium text-gray-700">Date</label>
-                <input type="date" id="addEventDateInput" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+        </div>
+    </div>
+    
+    <!-- Event Modal -->
+    <div id="eventModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden modal-backdrop">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+                <div class="p-6 border-b border-gray-200">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-semibold text-gray-900" id="event-modal-title">Add Event</h3>
+                        <button onclick="closeModal('eventModal')" class="text-gray-400 hover:text-gray-600 touch-target">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <form id="event-form" class="p-6 space-y-4">
+                    <input type="hidden" id="event-id">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Title</label>
+                        <input type="text" id="event-title" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                        <input type="date" id="event-date" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Time</label>
+                        <input type="time" id="event-time" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Type</label>
+                        <select id="event-type" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <option value="">Select Type</option>
+                            <option value="appointment">Appointment</option>
+                            <option value="meeting">Meeting</option>
+                            <option value="training">Training</option>
+                            <option value="maintenance">Maintenance</option>
+                        </select>
+                    </div>
+                    
+                    <div class="flex space-x-3 pt-4">
+                        <button type="submit" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors touch-target">
+                            <i class="fas fa-save mr-2"></i>Save
+                        </button>
+                        <button type="button" onclick="closeModal('eventModal')" class="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition-colors touch-target">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
             </div>
-            <div class="mt-6 flex justify-end space-x-3">
-                <button class="modal-close-btn px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
-                <button id="addEventBtn" type="button" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">Add Event</button>
+        </div>
+    </div>
+    
+    <!-- Appointment Modal -->
+    <div id="appointmentModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden modal-backdrop">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+                <div class="p-6 border-b border-gray-200">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-semibold text-gray-900">New Appointment</h3>
+                        <button onclick="closeModal('appointmentModal')" class="text-gray-400 hover:text-gray-600 touch-target">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <form id="appointment-form" class="p-6 space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Patient</label>
+                        <select id="appointment-patient" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <option value="">Select Patient</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Doctor</label>
+                        <select id="appointment-doctor" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <option value="">Select Doctor</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                        <input type="date" id="appointment-date" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Time</label>
+                        <input type="time" id="appointment-time" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Treatment</label>
+                        <input type="text" id="appointment-treatment" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+                        <textarea id="appointment-notes" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+                    </div>
+                    
+                    <div class="flex space-x-3 pt-4">
+                        <button type="submit" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors touch-target">
+                            <i class="fas fa-save mr-2"></i>Book Appointment
+                        </button>
+                        <button type="button" onclick="closeModal('appointmentModal')" class="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition-colors touch-target">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
 
-
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            // Sidebar toggle for mobile
-            const openSidebarBtn = document.getElementById('open-sidebar');
-            const closeSidebarBtn = document.getElementById('close-sidebar');
-            const sidebar = document.querySelector('.sidebar');
-
-            openSidebarBtn.addEventListener('click', () => sidebar.classList.add('open'));
-            closeSidebarBtn.addEventListener('click', () => sidebar.classList.remove('open'));
-
-            // Page Content Switching
-            const navLinks = document.querySelectorAll('.nav-link');
-            const pageContents = document.querySelectorAll('.page-content');
-
-            navLinks.forEach(link => {
-                link.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const targetId = link.getAttribute('data-target');
-
-                    navLinks.forEach(navLink => navLink.classList.remove('active'));
-                    link.classList.add('active');
-
-                    pageContents.forEach(content => {
-                        content.id === targetId ? content.classList.remove('hidden') : content.classList.add('hidden');
-                    });
-                    if (sidebar.classList.contains('open')) {
-                        sidebar.classList.remove('open');
+        // ========== DATA MANAGEMENT ==========
+        // Using JavaScript variables for data persistence (no localStorage due to sandbox restrictions)
+        
+        let doctors = [
+            {
+                id: 1,
+                name: "Dr. Rahul Gupta",
+                specialty: "Orthodontist",
+                phone: "+91 98765 43210",
+                email: "rahul.gupta@oral.com",
+                experience: "8 years",
+                image: "https://placehold.co/100x100/E2E8F0/4A5568?text=RG",
+                rating: 4.8,
+                patients: 150,
+                status: "Available"
+            },
+            {
+                id: 2,
+                name: "Dr. Priya Sharma",
+                specialty: "Dentist",
+                phone: "+91 98765 43211",
+                email: "priya.sharma@oral.com",
+                experience: "12 years",
+                image: "https://placehold.co/100x100/E2E8F0/4A5568?text=PS",
+                rating: 4.9,
+                patients: 200,
+                status: "Busy"
+            },
+            {
+                id: 3,
+                name: "Dr. Vikram Singh",
+                specialty: "Prosthodontist",
+                phone: "+91 98765 43212",
+                email: "vikram.singh@oral.com",
+                experience: "15 years",
+                image: "https://placehold.co/100x100/E2E8F0/4A5568?text=VS",
+                rating: 4.7,
+                patients: 180,
+                status: "Available"
+            },
+            {
+                id: 4,
+                name: "Dr. Sneha Reddy",
+                specialty: "Pediatric Dentist",
+                phone: "+91 98765 43213",
+                email: "sneha.reddy@oral.com",
+                experience: "6 years",
+                image: "https://placehold.co/100x100/E2E8F0/4A5568?text=SR",
+                rating: 4.6,
+                patients: 120,
+                status: "Available"
+            },
+            {
+                id: 5,
+                name: "Dr. Amit Kumar",
+                specialty: "Oral Surgeon",
+                phone: "+91 98765 43214",
+                email: "amit.kumar@oral.com",
+                experience: "10 years",
+                image: "https://placehold.co/100x100/E2E8F0/4A5568?text=AK",
+                rating: 4.8,
+                patients: 175,
+                status: "Available"
+            },
+            {
+                id: 6,
+                name: "Dr. Kavya Nair",
+                specialty: "Endodontist",
+                phone: "+91 98765 43215",
+                email: "kavya.nair@oral.com",
+                experience: "9 years",
+                image: "https://placehold.co/100x100/E2E8F0/4A5568?text=KN",
+                rating: 4.7,
+                patients: 140,
+                status: "Busy"
+            }
+        ];
+        
+        let patients = [
+            {
+                id: 1,
+                name: "Saanvi Sharma",
+                age: 24,
+                gender: "Female",
+                phone: "+91 98765 54321",
+                email: "saanvi@email.com",
+                address: "Mumbai, MH",
+                lastVisit: "05.12.2024",
+                nextAppointment: "17.10.2025",
+                treatment: "Root Canal Treatment",
+                patientId: "124569",
+                doctor: "Dr. Rahul Gupta",
+                status: "Active"
+            },
+            {
+                id: 2,
+                name: "Arjun Patel",
+                age: 32,
+                gender: "Male",
+                phone: "+91 98765 54322",
+                email: "arjun@email.com",
+                address: "Mumbai, MH",
+                lastVisit: "03.12.2024",
+                nextAppointment: "18.10.2025",
+                treatment: "Teeth Cleaning",
+                patientId: "124570",
+                doctor: "Dr. Priya Sharma",
+                status: "Active"
+            },
+            {
+                id: 3,
+                name: "Meera Singh",
+                age: 28,
+                gender: "Female",
+                phone: "+91 98765 54323",
+                email: "meera@email.com",
+                address: "Mumbai, MH",
+                lastVisit: "01.12.2024",
+                nextAppointment: "20.10.2025",
+                treatment: "Wisdom Tooth Extraction",
+                patientId: "124571",
+                doctor: "Dr. Vikram Singh",
+                status: "Active"
+            },
+            {
+                id: 4,
+                name: "Rahul Verma",
+                age: 35,
+                gender: "Male",
+                phone: "+91 98765 54324",
+                email: "rahul@email.com",
+                address: "Mumbai, MH",
+                lastVisit: "28.11.2024",
+                nextAppointment: "22.10.2025",
+                treatment: "Dental Implant",
+                patientId: "124572",
+                doctor: "Dr. Amit Kumar",
+                status: "Active"
+            }
+        ];
+        
+        let appointments = [
+            {
+                id: 1,
+                patientName: "Saanvi Sharma",
+                patientId: "124569",
+                doctorName: "Dr. Rahul Gupta",
+                date: "2025-10-17",
+                time: "10:00 AM",
+                treatment: "Root Canal",
+                status: "Scheduled",
+                duration: "60 min",
+                notes: "Follow-up session"
+            },
+            {
+                id: 2,
+                patientName: "Arjun Patel",
+                patientId: "124570",
+                doctorName: "Dr. Priya Sharma",
+                date: "2025-10-18",
+                time: "2:00 PM",
+                treatment: "Cleaning",
+                status: "Confirmed",
+                duration: "30 min",
+                notes: "Regular checkup"
+            },
+            {
+                id: 3,
+                patientName: "Meera Singh",
+                patientId: "124571",
+                doctorName: "Dr. Vikram Singh",
+                date: "2025-10-20",
+                time: "11:00 AM",
+                treatment: "Wisdom Tooth",
+                status: "Pending",
+                duration: "90 min",
+                notes: "Surgical extraction"
+            }
+        ];
+        
+        let events = [
+            {
+                id: 1,
+                title: "Team Meeting",
+                date: "2025-10-25",
+                time: "10:00 AM",
+                type: "meeting",
+                color: "#3b82f6"
+            },
+            {
+                id: 2,
+                title: "Dr. Sharma Appointment",
+                date: "2025-10-20",
+                time: "2:00 PM",
+                type: "appointment",
+                color: "#22c55e"
+            },
+            {
+                id: 3,
+                title: "Equipment Maintenance",
+                date: "2025-10-30",
+                time: "3:00 PM",
+                type: "maintenance",
+                color: "#f59e0b"
+            },
+            {
+                id: 4,
+                title: "Training Session",
+                date: "2025-10-28",
+                time: "9:00 AM",
+                type: "training",
+                color: "#8b5cf6"
+            }
+        ];
+        
+        let currentPage = 'dashboard';
+        let isDarkMode = false;
+        let calendar = null;
+        let appointmentChart = null;
+        let treatmentChart = null;
+        
+        // ========== UTILITY FUNCTIONS ==========
+        
+        function generateId() {
+            return Date.now() + Math.floor(Math.random() * 1000);
+        }
+        
+        function showToast(message, type = 'success') {
+            const toastContainer = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+            
+            toast.className = `toast ${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center space-x-3`;
+            toast.innerHTML = `
+                <i class="fas fa-${type === 'success' ? 'check' : type === 'error' ? 'exclamation-triangle' : 'info'}-circle"></i>
+                <span>${message}</span>
+                <button onclick="this.parentElement.remove()" class="ml-auto">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            
+            toastContainer.appendChild(toast);
+            
+            // Show toast
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 100);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    if (toast.parentElement) {
+                        toast.remove();
                     }
-                });
+                }, 300);
+            }, 5000);
+        }
+        
+        // ========== NAVIGATION ==========
+        
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('mobile-overlay');
+            
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('hidden');
+        }
+        
+        function showPage(pageName) {
+            // Hide all pages
+            document.querySelectorAll('.page-content').forEach(page => {
+                page.classList.add('hidden');
             });
-
-            // =================================================================
-            // Calendar Logic
-            // =================================================================
-            let currentDate = new Date();
-            let events = [ // Sample events
-                { id: 1, date: '2025-09-25', title: 'Team Meeting' },
-                { id: 2, date: '2025-09-10', title: 'Dr. Sharma Appointment' },
-                { id: 3, date: '2025-10-05', title: 'Conference Call' },
-            ];
-
-            const calendarGrid = document.getElementById('calendarGrid');
-            const calendarHeader = document.getElementById('calendarHeader');
-            const prevMonthBtn = document.getElementById('prevMonthBtn');
-            const nextMonthBtn = document.getElementById('nextMonthBtn');
-            const todayBtn = document.getElementById('todayBtn');
-
-            const editEventModal = document.getElementById('editEventModal');
-            const addEventModal = document.getElementById('addEventModal');
-
-            function renderCalendar() {
-                const year = currentDate.getFullYear();
-                const month = currentDate.getMonth();
+            
+            // Show selected page
+            const targetPage = document.getElementById(`${pageName}-page`);
+            if (targetPage) {
+                targetPage.classList.remove('hidden');
+            }
+            
+            // Update active nav item
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active', 'bg-blue-700');
+            });
+            
+            const activeNavItem = document.querySelector(`[onclick="showPage('${pageName}')"]`);
+            if (activeNavItem) {
+                activeNavItem.classList.add('active', 'bg-blue-700');
+            }
+            
+            // Update page title
+            const pageTitle = document.getElementById('page-title');
+            const titles = {
+                'dashboard': 'Dashboard',
+                'schedule': 'Schedule',
+                'doctors': 'Doctors',
+                'patients': 'Patients',
+                'settings': 'Settings',
+                'profile': 'Profile'
+            };
+            pageTitle.textContent = titles[pageName] || 'Dashboard';
+            
+            currentPage = pageName;
+            
+            // Close sidebar on mobile after navigation
+            if (window.innerWidth < 1024) {
+                toggleSidebar();
+            }
+            
+            // Initialize page-specific content
+            if (pageName === 'schedule' && !calendar) {
+                initializeCalendar();
+            } else if (pageName === 'doctors') {
+                renderDoctors();
+            } else if (pageName === 'patients') {
+                renderPatients();
+            }
+        }
+        
+        // ========== SEARCH FUNCTIONALITY ==========
+        
+        function toggleMobileSearch() {
+            const mobileSearch = document.getElementById('mobile-search');
+            mobileSearch.classList.toggle('hidden');
+            if (!mobileSearch.classList.contains('hidden')) {
+                document.getElementById('mobile-search-input').focus();
+            }
+        }
+        
+        function performSearch(query) {
+            if (!query) return;
+            
+            const results = {
+                doctors: doctors.filter(d => 
+                    d.name.toLowerCase().includes(query.toLowerCase()) ||
+                    d.specialty.toLowerCase().includes(query.toLowerCase())
+                ),
+                patients: patients.filter(p => 
+                    p.name.toLowerCase().includes(query.toLowerCase()) ||
+                    p.patientId.toLowerCase().includes(query.toLowerCase())
+                ),
+                appointments: appointments.filter(a => 
+                    a.patientName.toLowerCase().includes(query.toLowerCase()) ||
+                    a.doctorName.toLowerCase().includes(query.toLowerCase())
+                )
+            };
+            
+            // Show search results (simplified - just show toast with count)
+            const totalResults = results.doctors.length + results.patients.length + results.appointments.length;
+            showToast(`Found ${totalResults} results for "${query}"`, 'info');
+        }
+        
+        // ========== DARK MODE ==========
+        
+        function toggleDarkMode() {
+            isDarkMode = !isDarkMode;
+            const body = document.getElementById('body');
+            const icon = document.getElementById('dark-mode-icon');
+            
+            if (isDarkMode) {
+                body.classList.add('dark');
+                icon.className = 'fas fa-sun';
+            } else {
+                body.classList.remove('dark');
+                icon.className = 'fas fa-moon';
+            }
+            
+            showToast(`${isDarkMode ? 'Dark' : 'Light'} mode enabled`, 'info');
+        }
+        
+        // ========== MODAL MANAGEMENT ==========
+        
+        function openModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
                 
-                calendarHeader.textContent = `${currentDate.toLocaleString('default', { month: 'long' })} ${year}`;
-
-                const firstDayOfMonth = new Date(year, month, 1).getDay();
-                const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-                // Clear previous grid but keep headers
-                calendarGrid.innerHTML = `
-                    <div class="text-center py-2 bg-white text-xs font-semibold text-gray-500">Sun</div>
-                    <div class="text-center py-2 bg-white text-xs font-semibold text-gray-500">Mon</div>
-                    <div class="text-center py-2 bg-white text-xs font-semibold text-gray-500">Tue</div>
-                    <div class="text-center py-2 bg-white text-xs font-semibold text-gray-500">Wed</div>
-                    <div class="text-center py-2 bg-white text-xs font-semibold text-gray-500">Thu</div>
-                    <div class="text-center py-2 bg-white text-xs font-semibold text-gray-500">Fri</div>
-                    <div class="text-center py-2 bg-white text-xs font-semibold text-gray-500">Sat</div>
-                `;
-
-                // Add empty cells for days before the first of the month
-                for (let i = 0; i < firstDayOfMonth; i++) {
-                    calendarGrid.innerHTML += `<div class="h-28 bg-gray-50 p-1"></div>`;
+                // Populate dropdowns for appointment modal
+                if (modalId === 'appointmentModal') {
+                    populateAppointmentDropdowns();
                 }
-
-                // Add day cells
-                for (let day = 1; day <= daysInMonth; day++) {
-                    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                    const dayCell = document.createElement('div');
-                    dayCell.className = 'h-28 bg-white p-1 calendar-day cursor-pointer overflow-y-auto';
-                    dayCell.dataset.date = dateStr;
-                    dayCell.innerHTML = `<span class="text-sm">${day}</span>`;
-
-                    // Add events for this day
-                    const dayEvents = events.filter(e => e.date === dateStr);
-                    dayEvents.forEach(event => {
-                        const eventEl = document.createElement('div');
-                        eventEl.className = 'calendar-event text-xs p-1 mt-1 bg-blue-500 text-white rounded cursor-pointer truncate';
-                        eventEl.textContent = event.title;
-                        eventEl.dataset.eventId = event.id;
-                        eventEl.addEventListener('click', (e) => {
-                            e.stopPropagation(); // Prevent day click from firing
-                            openEditModal(event.id);
-                        });
-                        dayCell.appendChild(eventEl);
-                    });
+            }
+        }
+        
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.add('hidden');
+                document.body.style.overflow = 'auto';
+                
+                // Reset form
+                const form = modal.querySelector('form');
+                if (form) {
+                    form.reset();
+                    // Clear hidden ID field
+                    const idField = form.querySelector('input[type="hidden"]');
+                    if (idField) idField.value = '';
+                }
+            }
+        }
+        
+        // ========== DOCTOR MANAGEMENT ==========
+        
+        function renderDoctors() {
+            const grid = document.getElementById('doctors-grid');
+            grid.innerHTML = '';
+            
+            doctors.forEach(doctor => {
+                const doctorCard = document.createElement('div');
+                doctorCard.className = 'bg-white rounded-lg shadow-sm border border-gray-200 p-6';
+                doctorCard.innerHTML = `
+                    <div class="flex items-center space-x-4 mb-4">
+                        <img src="${doctor.image}" alt="${doctor.name}" class="w-16 h-16 rounded-full">
+                        <div class="flex-1">
+                            <h3 class="text-lg font-semibold text-gray-900">${doctor.name}</h3>
+                            <p class="text-gray-600">${doctor.specialty}</p>
+                            <div class="flex items-center space-x-2 mt-1">
+                                <div class="flex text-yellow-400">
+                                    ${Array(5).fill().map((_, i) => 
+                                        `<i class="fas fa-star ${i < Math.floor(doctor.rating) ? '' : 'text-gray-300'}"></i>`
+                                    ).join('')}
+                                </div>
+                                <span class="text-sm text-gray-600">${doctor.rating}</span>
+                            </div>
+                        </div>
+                    </div>
                     
-                    dayCell.addEventListener('click', () => {
-                        openAddModal(dateStr);
-                    });
-
-                    calendarGrid.appendChild(dayCell);
-                }
+                    <div class="space-y-2 text-sm text-gray-600 mb-4">
+                        <div class="flex items-center space-x-2">
+                            <i class="fas fa-phone w-4"></i>
+                            <span>${doctor.phone}</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <i class="fas fa-envelope w-4"></i>
+                            <span class="truncate">${doctor.email}</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <i class="fas fa-clock w-4"></i>
+                            <span>${doctor.experience} experience</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <i class="fas fa-users w-4"></i>
+                            <span>${doctor.patients} patients</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <span class="px-3 py-1 rounded-full text-sm ${
+                            doctor.status === 'Available' 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-red-100 text-red-800'
+                        }">
+                            ${doctor.status}
+                        </span>
+                        <div class="flex space-x-2">
+                            <button onclick="editDoctor(${doctor.id})" class="text-blue-600 hover:text-blue-800 touch-target">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button onclick="deleteDoctor(${doctor.id})" class="text-red-600 hover:text-red-800 touch-target">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                grid.appendChild(doctorCard);
+            });
+        }
+        
+        function editDoctor(id) {
+            const doctor = doctors.find(d => d.id === id);
+            if (!doctor) return;
+            
+            // Populate form
+            document.getElementById('doctor-id').value = doctor.id;
+            document.getElementById('doctor-name').value = doctor.name;
+            document.getElementById('doctor-specialty').value = doctor.specialty;
+            document.getElementById('doctor-phone').value = doctor.phone;
+            document.getElementById('doctor-email').value = doctor.email;
+            document.getElementById('doctor-experience').value = parseInt(doctor.experience);
+            
+            // Update modal title
+            document.getElementById('doctor-modal-title').textContent = 'Edit Doctor';
+            
+            openModal('doctorModal');
+        }
+        
+        function deleteDoctor(id) {
+            if (confirm('Are you sure you want to delete this doctor?')) {
+                doctors = doctors.filter(d => d.id !== id);
+                renderDoctors();
+                showToast('Doctor deleted successfully', 'success');
             }
+        }
+        
+        // ========== PATIENT MANAGEMENT ==========
+        
+        function renderPatients() {
+            const tbody = document.getElementById('patients-tbody');
+            tbody.innerHTML = '';
             
-            // Navigation listeners
-            prevMonthBtn.addEventListener('click', () => {
-                currentDate.setMonth(currentDate.getMonth() - 1);
-                renderCalendar();
+            patients.forEach(patient => {
+                const row = document.createElement('tr');
+                row.className = 'bg-white border-b hover:bg-gray-50';
+                row.innerHTML = `
+                    <td class="px-6 py-4">
+                        <div>
+                            <div class="font-medium text-gray-900">${patient.name}</div>
+                            <div class="text-sm text-gray-600">ID: ${patient.patientId}</div>
+                            <div class="text-sm text-gray-600 sm:hidden">${patient.phone}</div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 hidden sm:table-cell">
+                        <div class="text-sm text-gray-900">${patient.phone}</div>
+                        <div class="text-sm text-gray-600">${patient.email}</div>
+                    </td>
+                    <td class="px-6 py-4 hidden md:table-cell">
+                        <div class="text-sm text-gray-900">${patient.lastVisit}</div>
+                        <div class="text-sm text-gray-600">Next: ${patient.nextAppointment}</div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-xs font-medium rounded-full ${
+                            patient.status === 'Active' 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-gray-100 text-gray-800'
+                        }">
+                            ${patient.status}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="flex space-x-2">
+                            <button onclick="editPatient(${patient.id})" class="text-blue-600 hover:text-blue-800 touch-target">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button onclick="deletePatient(${patient.id})" class="text-red-600 hover:text-red-800 touch-target">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                
+                tbody.appendChild(row);
             });
-            nextMonthBtn.addEventListener('click', () => {
-                currentDate.setMonth(currentDate.getMonth() + 1);
-                renderCalendar();
-            });
-            todayBtn.addEventListener('click', () => {
-                currentDate = new Date();
-                renderCalendar();
-            });
-
-
-            // Modal Handling
-            const allCloseButtons = document.querySelectorAll('.modal-close-btn');
-            allCloseButtons.forEach(btn => btn.addEventListener('click', () => {
-                editEventModal.classList.add('hidden');
-                addEventModal.classList.add('hidden');
-            }));
-
-            // Edit Modal
-            const editEventTitleInput = document.getElementById('editEventTitleInput');
-            const editEventIdInput = document.getElementById('editEventId');
-            const saveEventBtn = document.getElementById('saveEventBtn');
-            const deleteEventBtn = document.getElementById('deleteEventBtn');
-
-            function openEditModal(eventId) {
-                const event = events.find(e => e.id === eventId);
-                if (event) {
-                    editEventTitleInput.value = event.title;
-                    editEventIdInput.value = event.id;
-                    editEventModal.classList.remove('hidden');
-                }
+        }
+        
+        function editPatient(id) {
+            const patient = patients.find(p => p.id === id);
+            if (!patient) return;
+            
+            // Populate form
+            document.getElementById('patient-id').value = patient.id;
+            document.getElementById('patient-name').value = patient.name;
+            document.getElementById('patient-age').value = patient.age;
+            document.getElementById('patient-gender').value = patient.gender;
+            document.getElementById('patient-phone').value = patient.phone;
+            document.getElementById('patient-email').value = patient.email;
+            document.getElementById('patient-address').value = patient.address;
+            
+            // Update modal title
+            document.getElementById('patient-modal-title').textContent = 'Edit Patient';
+            
+            openModal('patientModal');
+        }
+        
+        function deletePatient(id) {
+            if (confirm('Are you sure you want to delete this patient?')) {
+                patients = patients.filter(p => p.id !== id);
+                renderPatients();
+                showToast('Patient deleted successfully', 'success');
             }
-
-            saveEventBtn.addEventListener('click', () => {
-                const eventId = parseInt(editEventIdInput.value);
-                const eventIndex = events.findIndex(e => e.id === eventId);
-                if (eventIndex > -1 && editEventTitleInput.value.trim() !== '') {
-                    events[eventIndex].title = editEventTitleInput.value.trim();
-                    editEventModal.classList.add('hidden');
-                    renderCalendar();
-                }
+        }
+        
+        // ========== CALENDAR FUNCTIONALITY ==========
+        
+        function initializeCalendar() {
+            const calendarEl = document.getElementById('calendar');
+            
+            calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                },
+                events: events.map(event => ({
+                    id: event.id,
+                    title: event.title,
+                    start: `${event.date}T${convertTo24Hour(event.time)}`,
+                    backgroundColor: event.color,
+                    borderColor: event.color
+                })),
+                eventClick: function(info) {
+                    const event = events.find(e => e.id == info.event.id);
+                    if (event && confirm('Do you want to edit this event?')) {
+                        editEvent(event.id);
+                    }
+                },
+                dateClick: function(info) {
+                    // Set date in event form and open modal
+                    document.getElementById('event-date').value = info.dateStr;
+                    openModal('eventModal');
+                },
+                height: 'auto',
+                responsive: true
             });
             
-            deleteEventBtn.addEventListener('click', () => {
-                const eventId = parseInt(editEventIdInput.value);
-                events = events.filter(e => e.id !== eventId);
-                editEventModal.classList.add('hidden');
-                renderCalendar();
-            });
-            
-            // Add Modal
-            const addEventTitleInput = document.getElementById('addEventTitleInput');
-            const addEventDateInput = document.getElementById('addEventDateInput');
-            const addEventBtn = document.getElementById('addEventBtn');
-            const addNewEventBtn = document.getElementById('addNewEventBtn');
-            const createNewEventBtn = document.getElementById('createNewEventBtn');
-            
-            function openAddModal(date = null) {
-                addEventTitleInput.value = '';
-                addEventDateInput.value = date || '';
-                addEventModal.classList.remove('hidden');
+            calendar.render();
+        }
+        
+        function convertTo24Hour(time12h) {
+            const [time, modifier] = time12h.split(' ');
+            let [hours, minutes] = time.split(':');
+            if (hours === '12') {
+                hours = '00';
             }
-
-            addNewEventBtn.addEventListener('click', () => openAddModal());
-            createNewEventBtn.addEventListener('click', () => openAddModal());
-
-            addEventBtn.addEventListener('click', () => {
-                const title = addEventTitleInput.value.trim();
-                const date = addEventDateInput.value;
-                if(title && date) {
-                    const newEvent = {
-                        id: Date.now(), // simple unique id
-                        title: title,
-                        date: date
-                    };
-                    events.push(newEvent);
-                    addEventModal.classList.add('hidden');
-                    renderCalendar();
-                }
-            });
-
-            // Initial render
-            renderCalendar();
-
-            // Chart.js Implementations (remain unchanged)
+            if (modifier === 'PM') {
+                hours = parseInt(hours, 10) + 12;
+            }
+            return `${hours}:${minutes}:00`;
+        }
+        
+        function editEvent(id) {
+            const event = events.find(e => e.id === id);
+            if (!event) return;
+            
+            document.getElementById('event-id').value = event.id;
+            document.getElementById('event-title').value = event.title;
+            document.getElementById('event-date').value = event.date;
+            document.getElementById('event-time').value = convertTo24Hour(event.time);
+            document.getElementById('event-type').value = event.type;
+            
+            document.getElementById('event-modal-title').textContent = 'Edit Event';
+            openModal('eventModal');
+        }
+        
+        function refreshCalendar() {
+            if (calendar) {
+                calendar.refetchEvents();
+                showToast('Calendar refreshed', 'info');
+            }
+        }
+        
+        // ========== CHARTS ==========
+        
+        function initializeCharts() {
+            // Appointment Chart
             const appointmentCtx = document.getElementById('appointmentChart').getContext('2d');
-            new Chart(appointmentCtx, {
-                type: 'bar',
+            appointmentChart = new Chart(appointmentCtx, {
+                type: 'line',
                 data: {
-                    labels: ['Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'],
+                    labels: ["Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct"],
                     datasets: [{
-                        label: 'Net Profit',
+                        label: "Net Profit",
                         data: [12, 19, 10, 15, 12, 13, 18, 14, 19],
-                        backgroundColor: '#3b82f6', borderRadius: 6, barPercentage: 0.5,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        tension: 0.4
                     }, {
-                        label: 'Revenue',
+                        label: "Revenue",
                         data: [18, 22, 15, 19, 18, 17, 24, 20, 25],
-                        backgroundColor: '#60a5fa', borderRadius: 6, barPercentage: 0.5,
+                        borderColor: '#22c55e',
+                        backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                        tension: 0.4
                     }]
                 },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', align: 'end', labels: { usePointStyle: true, boxWidth: 8 }}}, scales: { y: { beginAtZero: true, grid: { drawBorder: false }}, x: { grid: { display: false }}}}
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    }
+                }
             });
-            const treatmentsCtx = document.getElementById('treatmentsChart').getContext('2d');
-            new Chart(treatmentsCtx, {
+            
+            // Treatment Chart
+            const treatmentCtx = document.getElementById('treatmentChart').getContext('2d');
+            treatmentChart = new Chart(treatmentCtx, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Root Canal', 'Wisdom Tooth', 'Bleaching', 'Others'],
+                    labels: ["Root Canal", "Wisdom Tooth", "Bleaching", "Others"],
                     datasets: [{
                         data: [40, 25, 20, 15],
-                        backgroundColor: ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444'],
-                        borderColor: '#fff', borderWidth: 4,
+                        backgroundColor: ["#3b82f6", "#22c55e", "#f59e0b", "#ef4444"],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
                     }]
                 },
-                options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => `${c.label}: ${c.parsed}%` }}}}
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
             });
+        }
+        
+        function exportChart(chartId) {
+            const chart = chartId === 'appointmentChart' ? appointmentChart : treatmentChart;
+            if (chart) {
+                const url = chart.toBase64Image();
+                const link = document.createElement('a');
+                link.download = `${chartId}.png`;
+                link.href = url;
+                link.click();
+                showToast('Chart exported successfully', 'success');
+            }
+        }
+        
+        // ========== FORM HANDLERS ==========
+        
+        function populateAppointmentDropdowns() {
+            const patientSelect = document.getElementById('appointment-patient');
+            const doctorSelect = document.getElementById('appointment-doctor');
+            
+            // Clear existing options
+            patientSelect.innerHTML = '<option value="">Select Patient</option>';
+            doctorSelect.innerHTML = '<option value="">Select Doctor</option>';
+            
+            // Populate patients
+            patients.forEach(patient => {
+                const option = document.createElement('option');
+                option.value = patient.id;
+                option.textContent = `${patient.name} (${patient.patientId})`;
+                patientSelect.appendChild(option);
+            });
+            
+            // Populate doctors
+            doctors.forEach(doctor => {
+                const option = document.createElement('option');
+                option.value = doctor.id;
+                option.textContent = `${doctor.name} - ${doctor.specialty}`;
+                doctorSelect.appendChild(option);
+            });
+        }
+        
+        // ========== UTILITY FUNCTIONS ==========
+        
+        function generateReport() {
+            showToast('Generating report...', 'info');
+            
+            // Simulate report generation
+            setTimeout(() => {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                
+                doc.text('Oral Admin Dashboard Report', 20, 20);
+                doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 40);
+                doc.text(`Total Doctors: ${doctors.length}`, 20, 60);
+                doc.text(`Total Patients: ${patients.length}`, 20, 80);
+                doc.text(`Total Appointments: ${appointments.length}`, 20, 100);
+                
+                doc.save('oral-admin-report.pdf');
+                showToast('Report generated successfully', 'success');
+            }, 1000);
+        }
+        
+        function saveSettings() {
+            showToast('Settings saved successfully', 'success');
+        }
+        
+        function editProfile() {
+            const inputs = document.querySelectorAll('#profile-page input[readonly]');
+            inputs.forEach(input => {
+                input.removeAttribute('readonly');
+                input.classList.add('bg-yellow-50');
+            });
+            showToast('Profile editing enabled', 'info');
+        }
+        
+        function changePassword() {
+            showToast('Password change feature coming soon', 'info');
+        }
+        
+        function enableTwoFactor() {
+            showToast('Two-factor authentication setup coming soon', 'info');
+        }
+        
+        function showNotifications() {
+            showToast('You have 3 new notifications', 'info');
+        }
+        
+        function toggleProfileMenu() {
+            showToast('Profile menu feature coming soon', 'info');
+        }
+        
+        // ========== EVENT LISTENERS ==========
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize charts
+            initializeCharts();
+            
+            // Search functionality
+            const globalSearch = document.getElementById('global-search');
+            const mobileSearchInput = document.getElementById('mobile-search-input');
+            
+            [globalSearch, mobileSearchInput].forEach(input => {
+                if (input) {
+                    input.addEventListener('keypress', function(e) {
+                        if (e.key === 'Enter') {
+                            performSearch(this.value.trim());
+                        }
+                    });
+                }
+            });
+            
+            // Doctor form submission
+            document.getElementById('doctor-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData(this);
+                const doctorData = {
+                    name: document.getElementById('doctor-name').value,
+                    specialty: document.getElementById('doctor-specialty').value,
+                    phone: document.getElementById('doctor-phone').value,
+                    email: document.getElementById('doctor-email').value,
+                    experience: document.getElementById('doctor-experience').value + ' years',
+                    image: `https://placehold.co/100x100/E2E8F0/4A5568?text=${document.getElementById('doctor-name').value.split(' ').map(n => n[0]).join('')}`,
+                    rating: 4.5,
+                    patients: 0,
+                    status: 'Available'
+                };
+                
+                const id = document.getElementById('doctor-id').value;
+                if (id) {
+                    // Update existing doctor
+                    const index = doctors.findIndex(d => d.id == id);
+                    if (index !== -1) {
+                        doctors[index] = { ...doctors[index], ...doctorData };
+                        showToast('Doctor updated successfully', 'success');
+                    }
+                } else {
+                    // Add new doctor
+                    doctorData.id = generateId();
+                    doctors.push(doctorData);
+                    showToast('Doctor added successfully', 'success');
+                }
+                
+                closeModal('doctorModal');
+                renderDoctors();
+            });
+            
+            // Patient form submission
+            document.getElementById('patient-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const patientData = {
+                    name: document.getElementById('patient-name').value,
+                    age: parseInt(document.getElementById('patient-age').value),
+                    gender: document.getElementById('patient-gender').value,
+                    phone: document.getElementById('patient-phone').value,
+                    email: document.getElementById('patient-email').value,
+                    address: document.getElementById('patient-address').value,
+                    lastVisit: new Date().toLocaleDateString('en-GB'),
+                    nextAppointment: '',
+                    treatment: '',
+                    patientId: 'P' + Date.now().toString().slice(-6),
+                    doctor: '',
+                    status: 'Active'
+                };
+                
+                const id = document.getElementById('patient-id').value;
+                if (id) {
+                    // Update existing patient
+                    const index = patients.findIndex(p => p.id == id);
+                    if (index !== -1) {
+                        patients[index] = { ...patients[index], ...patientData };
+                        showToast('Patient updated successfully', 'success');
+                    }
+                } else {
+                    // Add new patient
+                    patientData.id = generateId();
+                    patients.push(patientData);
+                    showToast('Patient added successfully', 'success');
+                }
+                
+                closeModal('patientModal');
+                renderPatients();
+            });
+            
+            // Event form submission
+            document.getElementById('event-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const eventData = {
+                    title: document.getElementById('event-title').value,
+                    date: document.getElementById('event-date').value,
+                    time: document.getElementById('event-time').value,
+                    type: document.getElementById('event-type').value,
+                    color: getEventColor(document.getElementById('event-type').value)
+                };
+                
+                const id = document.getElementById('event-id').value;
+                if (id) {
+                    // Update existing event
+                    const index = events.findIndex(e => e.id == id);
+                    if (index !== -1) {
+                        events[index] = { ...events[index], ...eventData };
+                        showToast('Event updated successfully', 'success');
+                    }
+                } else {
+                    // Add new event
+                    eventData.id = generateId();
+                    events.push(eventData);
+                    showToast('Event added successfully', 'success');
+                }
+                
+                closeModal('eventModal');
+                
+                // Update calendar
+                if (calendar) {
+                    calendar.refetchEvents();
+                }
+            });
+            
+            // Appointment form submission
+            document.getElementById('appointment-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const patientId = document.getElementById('appointment-patient').value;
+                const doctorId = document.getElementById('appointment-doctor').value;
+                const patient = patients.find(p => p.id == patientId);
+                const doctor = doctors.find(d => d.id == doctorId);
+                
+                if (!patient || !doctor) {
+                    showToast('Please select valid patient and doctor', 'error');
+                    return;
+                }
+                
+                const appointmentData = {
+                    id: generateId(),
+                    patientName: patient.name,
+                    patientId: patient.patientId,
+                    doctorName: doctor.name,
+                    date: document.getElementById('appointment-date').value,
+                    time: document.getElementById('appointment-time').value,
+                    treatment: document.getElementById('appointment-treatment').value,
+                    status: 'Scheduled',
+                    duration: '45 min',
+                    notes: document.getElementById('appointment-notes').value
+                };
+                
+                appointments.push(appointmentData);
+                showToast('Appointment booked successfully', 'success');
+                closeModal('appointmentModal');
+            });
+            
+            // Mobile touch events and responsive handling
+            let startY = 0;
+            let isPulling = false;
+            
+            document.addEventListener('touchstart', function(e) {
+                startY = e.touches[0].pageY;
+            });
+            
+            document.addEventListener('touchmove', function(e) {
+                const currentY = e.touches[0].pageY;
+                const pullDistance = currentY - startY;
+                
+                if (pullDistance > 0 && window.scrollY === 0) {
+                    isPulling = true;
+                    // Add pull-to-refresh visual feedback here
+                }
+            });
+            
+            document.addEventListener('touchend', function(e) {
+                if (isPulling) {
+                    isPulling = false;
+                    // Trigger refresh action
+                    showToast('Page refreshed', 'info');
+                }
+            });
+        });
+        
+        function getEventColor(type) {
+            const colors = {
+                'appointment': '#22c55e',
+                'meeting': '#3b82f6',
+                'training': '#8b5cf6',
+                'maintenance': '#f59e0b'
+            };
+            return colors[type] || '#6b7280';
+        }
+        
+        // Handle window resize for mobile responsiveness
+        window.addEventListener('resize', function() {
+            if (window.innerWidth >= 1024) {
+                // Desktop view - show sidebar
+                document.getElementById('sidebar').classList.remove('mobile-sidebar', 'open');
+                document.getElementById('mobile-overlay').classList.add('hidden');
+            } else {
+                // Mobile view - hide sidebar
+                document.getElementById('sidebar').classList.add('mobile-sidebar');
+                document.getElementById('sidebar').classList.remove('open');
+                document.getElementById('mobile-overlay').classList.add('hidden');
+            }
+        });
+        
+        // Close modals when clicking outside
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('modal-backdrop')) {
+                const modals = ['doctorModal', 'patientModal', 'eventModal', 'appointmentModal'];
+                modals.forEach(modalId => {
+                    const modal = document.getElementById(modalId);
+                    if (modal && !modal.classList.contains('hidden')) {
+                        closeModal(modalId);
+                    }
+                });
+            }
+        });
+        
+        // Initialize default page
+        document.addEventListener('DOMContentLoaded', function() {
+            showPage('dashboard');
         });
     </script>
 </body>
 </html>
-
